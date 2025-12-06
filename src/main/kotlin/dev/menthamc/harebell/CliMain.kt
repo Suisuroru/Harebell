@@ -1,4 +1,4 @@
-package dev.menthamc.harebell
+﻿package dev.menthamc.harebell
 
 import dev.menthamc.harebell.data.GithubAsset
 import dev.menthamc.harebell.data.GithubRelease
@@ -35,15 +35,14 @@ object CliMain {
             ?: config.jarName
 
         if (installDir.isBlank()) {
-            cliError("缺少下载目录：请提供 --dir=<path> 或在配置文件/参数中指定")
+            cliError("缺少下载目录：请提供 -DinstallDir=目录 或在配置文件/参数中指定")
             return
         }
 
         cliBanner("Harebell")
-        cliInfo("版本下载目录: $installDir")
-        cliInfo("选择版本: ${releaseTagInput ?: "第一次启动默认选择最新"}")
+        cliInfo("目录: $installDir")
         if (jarName.isNotBlank()) {
-            cliInfo("保存文件名: ${normalizeJarName(jarName, "harebell.jar")}")
+            cliInfo("文件名: ${normalizeJarName(jarName, "harebell.jar")}")
         }
 
         val releases = try {
@@ -79,7 +78,7 @@ object CliMain {
         if (Files.exists(target) && config.jarHash.isNotBlank()) {
             val currentHash = sha256(target)
             if (currentHash.equals(config.jarHash, ignoreCase = true)) {
-                cliInfo("本地 hash 与配置一致，已是目标版本，跳过下载: $targetName")
+                cliInfo("本地 hash 与配置一致，跳过下载: $targetName")
                 needDownload = false
                 finalHash = currentHash
             } else {
@@ -231,10 +230,20 @@ private fun sha256(path: Path): String {
 }
 
 private fun cliBanner(title: String, desc: String? = null) {
-    println("===================================================")
-    println(" $title")
-    desc?.let { println(" $it") }
-    println("===================================================")
+    val rawLines = listOfNotNull(title, desc)
+    if (rawLines.isEmpty()) return
+    val rendered = rawLines.mapIndexed { idx, line ->
+        if (idx == 0) ">> $line <<" else line
+    }
+    val width = rendered.maxOf { it.length }.coerceAtLeast(12)
+    val top = "+=" + "=".repeat(width + 4) + "=+"
+    val bottom = "+-" + "-".repeat(width + 4) + "-+"
+    println(top)
+    rendered.forEach { line ->
+        val pad = width - line.length
+        println("||  $line${" ".repeat(pad)}  ||")
+    }
+    println(bottom)
 }
 
 private fun cliStep(msg: String) = println("[*] $msg")
