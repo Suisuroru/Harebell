@@ -24,7 +24,7 @@ kotlin {
 }
 
 tasks.named<ShadowJar>("shadowJar") {
-    archiveBaseName.set("harebell-cli")
+    archiveBaseName.set("harebell")
     archiveClassifier.set("")
     archiveVersion.set("")
     mergeServiceFiles()

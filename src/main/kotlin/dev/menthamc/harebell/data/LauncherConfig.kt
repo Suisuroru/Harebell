@@ -1,4 +1,4 @@
-package dev.menthamc.mintlauncher.data
+package dev.menthamc.harebell.data
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

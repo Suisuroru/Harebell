@@ -1,4 +1,4 @@
-package dev.menthamc.mintlauncher
+package dev.menthamc.harebell
 
 /**
  * CLI-only 入口，转发到 CliMain

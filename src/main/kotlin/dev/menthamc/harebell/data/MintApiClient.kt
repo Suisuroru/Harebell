@@ -1,4 +1,4 @@
-package dev.menthamc.mintlauncher.data
+package dev.menthamc.harebell.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -17,7 +17,6 @@ import java.time.Duration
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.system.measureTimeMillis
 
 private const val USER_AGENT = "Harebell/1.0"
 

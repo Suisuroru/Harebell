@@ -1,4 +1,4 @@
-package dev.menthamc.mintlauncher.data
+package dev.menthamc.harebell.data
 
 data class RepoTarget(
     val owner: String = "MenthaMC",

@@ -1,4 +1,4 @@
-﻿package dev.menthamc.mintlauncher.data
+﻿package dev.menthamc.harebell.data
 
 enum class ProxySource(val baseUrl: String) {
     ORIGIN(""),

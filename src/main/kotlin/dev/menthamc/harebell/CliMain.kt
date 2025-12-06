@@ -1,12 +1,14 @@
-package dev.menthamc.mintlauncher
+package dev.menthamc.harebell
 
-import dev.menthamc.mintlauncher.data.GithubAsset
-import dev.menthamc.mintlauncher.data.GithubRelease
-import dev.menthamc.mintlauncher.data.LauncherConfigStore
-import dev.menthamc.mintlauncher.data.MintApiClient
-import dev.menthamc.mintlauncher.data.RepoTarget
+import dev.menthamc.harebell.data.GithubAsset
+import dev.menthamc.harebell.data.GithubRelease
+import dev.menthamc.harebell.data.LauncherConfigStore
+import dev.menthamc.harebell.data.MintApiClient
+import dev.menthamc.harebell.data.ProxyTiming
+import dev.menthamc.harebell.data.RepoTarget
 import java.nio.file.Paths
 import java.nio.file.Files
+import java.nio.file.Path
 import java.security.MessageDigest
 
 fun main(args: Array<String>) = CliMain.main(args)
@@ -93,7 +95,7 @@ object CliMain {
 
             try {
                 val timingsText = proxyChoice.timings
-                    .sortedWith(compareBy<dev.menthamc.mintlauncher.data.ProxyTiming> { !it.ok }
+                    .sortedWith(compareBy<ProxyTiming> { !it.ok }
                         .thenByDescending { it.bytesPerSec ?: 0 }
                         .thenBy { it.elapsedMs ?: Long.MAX_VALUE })
                     .joinToString(", ") { t ->
@@ -215,7 +217,7 @@ private fun normalizeJarName(desired: String?, assetName: String): String {
     } else clean
 }
 
-private fun sha256(path: java.nio.file.Path): String {
+private fun sha256(path: Path): String {
     val digest = MessageDigest.getInstance("SHA-256")
     Files.newInputStream(path).use { input ->
         val buf = ByteArray(8192)
