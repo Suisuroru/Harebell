@@ -28,11 +28,7 @@ class LauncherConfigStore(
     }
 
     fun load(): LauncherConfig {
-        val pathToRead = when {
-            Files.exists(configPath) -> configPath
-            Files.exists(legacyConfigPath) -> legacyConfigPath
-            else -> null
-        }
+        val pathToRead = existingConfigPath()
         val loaded = try {
             if (pathToRead != null) {
                 val text = Files.readString(pathToRead)
@@ -50,5 +46,15 @@ class LauncherConfigStore(
     fun save(config: LauncherConfig) {
         val text = json.encodeToString(LauncherConfig.serializer(), config)
         Files.writeString(configPath, text)
+    }
+
+    fun hasExistingConfig(): Boolean = existingConfigPath() != null
+
+    fun configSourcePath(): Path? = existingConfigPath()
+
+    private fun existingConfigPath(): Path? = when {
+        Files.exists(configPath) -> configPath
+        Files.exists(legacyConfigPath) -> legacyConfigPath
+        else -> null
     }
 }

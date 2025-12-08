@@ -6,10 +6,15 @@ import dev.menthamc.harebell.data.LauncherConfigStore
 import dev.menthamc.harebell.data.MintApiClient
 import dev.menthamc.harebell.data.ProxyTiming
 import dev.menthamc.harebell.data.RepoTarget
-import java.nio.file.Paths
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.security.MessageDigest
+
+private const val REPO_URL = "https://github.com/MenthaMC/Harebell"
+private const val ANSI_RESET = "\u001B[0m"
+private val ANSI_ENABLED = System.getenv("NO_COLOR") == null
+private val ANSI_REGEX = Regex("\u001B\\[[;?0-9]*[ -/]*[@-~]")
 
 fun main(args: Array<String>) = CliMain.main(args)
 
@@ -34,15 +39,22 @@ object CliMain {
         val jarName = System.getProperty("jarName")
             ?: config.jarName
 
+        val hasConfigFile = configStore.hasExistingConfig()
+        val hasInstallProp = System.getProperty("installDir")?.isNotBlank() == true
+        val configSourcePath = configStore.configSourcePath()
+        printIntro(
+            repoUrl = REPO_URL,
+            installDir = installDir,
+            jarName = jarName,
+            showDir = hasConfigFile || hasInstallProp
+        )
+        configSourcePath?.let {
+            cliInfo("已找到配置文件: ${it.toAbsolutePath()}")
+        } ?: cliInfo("未找到配置文件，将使用默认配置并生成 harebell.json")
+
         if (installDir.isBlank()) {
             cliError("缺少下载目录：请提供 -DinstallDir=目录 或在配置文件/参数中指定")
             return
-        }
-
-        cliBanner("Harebell")
-        cliInfo("目录: $installDir")
-        if (jarName.isNotBlank()) {
-            cliInfo("文件名: ${normalizeJarName(jarName, "harebell.jar")}")
         }
 
         val releases = try {
@@ -62,7 +74,7 @@ object CliMain {
             return
         }
         val releaseTag = release.tagName
-        cliInfo("选用版本: $releaseTag")
+        cliInfo("最新版本: $releaseTag")
 
         val asset = chooseJarAsset(release)
             ?: run {
@@ -160,15 +172,79 @@ object CliMain {
     }
 }
 
-private fun argValue(args: Array<String>, vararg keys: String): String? {
-    val set = keys.toSet()
-    args.forEach { arg ->
-        set.firstOrNull { arg.startsWith("$it=") }?.let { key ->
-            return arg.removePrefix("$key=")
-        }
+@Suppress("UNUSED_PARAMETER")
+private fun printIntro(repoUrl: String, installDir: String, jarName: String, showDir: Boolean) {
+    val palette = if (ANSI_ENABLED) {
+        listOf("\u001B[38;5;45m", "\u001B[38;5;81m", "\u001B[38;5;117m", "\u001B[38;5;153m", "\u001B[38;5;189m", "\u001B[38;5;219m")
+    } else {
+        listOf("")
     }
-    return null
+    val letters = listOf(
+        arrayOf("██╗  ██╗", "██║  ██║", "███████║", "██╔══██║", "██║  ██║", "╚═╝  ╚═╝"),
+        arrayOf(" █████╗ ", "██╔══██╗", "███████║", "██╔══██║", "██║  ██║", "╚═╝  ╚═╝"),
+        arrayOf("██████╗ ", "██╔══██╗", "██████╔╝", "██╔══██╗", "██║  ██║", "╚═╝  ╚═╝"),
+        arrayOf("███████╗", "██╔════╝", "█████╗  ", "██╔══╝  ", "███████╗", "╚══════╝"),
+        arrayOf("██████╗ ", "██╔══██╗", "██████╔╝", "██╔══██╗", "██████╔╝", "╚═════╝ "),
+        arrayOf("███████╗", "██╔════╝", "█████╗  ", "██╔══╝  ", "███████╗", "╚══════╝"),
+        arrayOf("██╗     ", "██║     ", "██║     ", "██║     ", "███████╗", "╚══════╝"),
+        arrayOf("██╗     ", "██║     ", "██║     ", "██║     ", "███████╗", "╚══════╝")
+    )
+    val rows = letters.first().size
+    val spacing = "  "
+    for (row in 0 until rows) {
+        val line = buildString {
+            letters.forEachIndexed { idx, letter ->
+                val color = palette[idx % palette.size]
+                append(colorize(letter[row], color))
+                if (idx != letters.lastIndex) append(spacing)
+            }
+        }
+        println(line)
+    }
+
+    println()
+    val infoLines = mutableListOf<String>()
+    infoLines += accent("Harebell 更新程序已准备就绪", "\u001B[38;5;183m")
+    infoLines += "了解更多: $REPO_URL"
+    printBox(infoLines)
 }
+
+private fun printBox(lines: List<String>) {
+    if (lines.isEmpty()) return
+    val contentWidth = lines.maxOf { visibleLength(it) }
+    val innerWidth = contentWidth + 2
+    val borderColor = if (ANSI_ENABLED) "\u001B[38;5;105m" else ""
+    val reset = if (ANSI_ENABLED) ANSI_RESET else ""
+    val horizontal = "─".repeat(innerWidth)
+    println(borderColor + "┌$horizontal┐" + reset)
+    lines.forEach { line ->
+        val pad = contentWidth - visibleLength(line)
+        println(borderColor + "│ " + reset + line + " ".repeat(pad) + borderColor + " │" + reset)
+    }
+    println(borderColor + "└$horizontal┘" + reset)
+}
+
+private fun visibleLength(text: String): Int {
+    val cleaned = ANSI_REGEX.replace(text, "")
+    return cleaned.sumOf { chDisplayWidth(it) }
+}
+
+
+private fun chDisplayWidth(ch: Char): Int = when {
+    ch.code in 0x3400..0x4DBF -> 2 // CJK Extension A
+    ch.code in 0x4E00..0x9FFF -> 2 // CJK Unified
+    ch.code in 0x3040..0x30FF -> 2 // Hiragana/Katakana
+    ch.code in 0x3000..0x303F -> 2 // CJK punctuation
+    ch.code in 0xFF00..0xFFEF -> 2 // Fullwidth forms
+    Character.getType(ch) == Character.NON_SPACING_MARK.toInt() -> 0
+    else -> 1
+}
+
+private fun accent(text: String, color: String = "\u001B[38;5;111m"): String =
+    colorize(text, color)
+
+private fun colorize(text: String, color: String): String =
+    if (ANSI_ENABLED && color.isNotEmpty()) "$color$text$ANSI_RESET" else text
 
 private fun chooseJarAsset(release: GithubRelease): GithubAsset? {
     val jars = release.assets.filter { it.name.endsWith(".jar", ignoreCase = true) }
@@ -227,23 +303,6 @@ private fun sha256(path: Path): String {
         }
     }
     return digest.digest().joinToString("") { "%02x".format(it) }
-}
-
-private fun cliBanner(title: String, desc: String? = null) {
-    val rawLines = listOfNotNull(title, desc)
-    if (rawLines.isEmpty()) return
-    val rendered = rawLines.mapIndexed { idx, line ->
-        if (idx == 0) ">> $line <<" else line
-    }
-    val width = rendered.maxOf { it.length }.coerceAtLeast(12)
-    val top = "+=" + "=".repeat(width + 4) + "=+"
-    val bottom = "+-" + "-".repeat(width + 4) + "-+"
-    println(top)
-    rendered.forEach { line ->
-        val pad = width - line.length
-        println("||  $line${" ".repeat(pad)}  ||")
-    }
-    println(bottom)
 }
 
 private fun cliStep(msg: String) = println("[*] $msg")
