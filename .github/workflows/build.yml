@@ -62,7 +62,7 @@ jobs:
         if: env.flag_release == 'true'
         with:
           tag: ${{ env.version }}-${{ env.commit }}
-          name: HareBell -
+          name: HareBell - ${{ env.version }} - ${{ env.commit }}
           body: |
             ### Version Info
             > ${{ env.version }}-${{ env.commit }}
