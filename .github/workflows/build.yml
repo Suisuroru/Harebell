@@ -34,7 +34,8 @@ jobs:
           prop() {
             grep "^[[:space:]]*${1}" gradle.properties | cut -d'=' -f2 | sed 's/^[[:space:]]*//; s/\r//'
           }
-          echo "commit=$(git log --pretty='> [%h] %s' -1)" >> $GITHUB_ENV
+          echo "commit=$(git log --pretty='%h' -1)" >> $GITHUB_ENV
+          echo "commit_msg=$(git log --pretty='> [%h] %s' -1)" >> $GITHUB_ENV
           echo "version=$(prop version)" >> $GITHUB_ENV
 
           flag_release=false
@@ -64,6 +65,8 @@ jobs:
             ### Version Info
             > ${{ env.version }}-${{ env.commit }}
             This release is automatically compiled by GitHub Actions.
+            ### Commit Info
+            ${{ env.commit_msg }}
           artifacts: |
             build/libs/harebell.jar
           generateReleaseNotes: true
