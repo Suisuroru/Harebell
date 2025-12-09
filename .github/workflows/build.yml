@@ -38,8 +38,10 @@ jobs:
           echo "commit_msg=$(git log --pretty='> [%h] %s' -1)" >> $GITHUB_ENV
           echo "version=$(prop version)" >> $GITHUB_ENV
 
+          make_latest=false
           flag_release=false
           pre=false
+          release=$(prop release)
           if [ "$release" = "1" ]; then
             flag_release=true
             make_latest=true
