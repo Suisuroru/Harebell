@@ -41,7 +41,7 @@ data class GithubRelease(
     val assets: List<GithubAsset> = emptyList()
 )
 
-class HareBellApiClient(
+class GithubApiClient(
     private val repoTarget: RepoTarget,
     private val proxySources: List<ProxySource> = ProxySource.values().toList()
 ) {

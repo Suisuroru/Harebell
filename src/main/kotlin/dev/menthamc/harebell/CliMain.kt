@@ -1,9 +1,6 @@
 ﻿package dev.menthamc.harebell
 
-import RepoInit
 import dev.menthamc.harebell.data.*
-import java.io.PrintStream
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -45,7 +42,7 @@ object CliMain {
             repoTarget = RepoTarget(repoOwner, repoName)
         }
 
-        val apiClient = HareBellApiClient(repoTarget = repoTarget)
+        val apiClient = GithubApiClient(repoTarget = repoTarget)
 
         val hasConfigFile = configStore.hasExistingConfig()
         val hasInstallProp = System.getProperty("installDir")?.isNotBlank() == true

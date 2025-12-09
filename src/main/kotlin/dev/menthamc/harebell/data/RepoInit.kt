@@ -1,5 +1,4 @@
-import dev.menthamc.harebell.data.BuildInRepo
-import dev.menthamc.harebell.data.RepoTarget
+package dev.menthamc.harebell.data
 
 class RepoInit {
     fun init(): RepoTarget {
