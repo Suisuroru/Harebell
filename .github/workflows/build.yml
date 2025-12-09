@@ -1,0 +1,76 @@
+name: Auto Build
+
+on:
+  push:
+    branches:
+      - "main"
+
+permissions: write-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: default
+    steps:
+      - name: Checkout Git Repository
+        uses: actions/checkout@v6
+
+      - name: Set Up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Build Harebell
+        run: |
+          chmod +x gradlew
+          ./gradlew --refresh-dependencies shadowJar
+
+      - name : Setup Env
+        run: |
+          prop() {
+            grep "^[[:space:]]*${1}" gradle.properties | cut -d'=' -f2 | sed 's/^[[:space:]]*//; s/\r//'
+          }
+          echo "commit=$(git log --pretty='%h' -1)" >> $GITHUB_ENV
+          echo "commit_msg=$(git log --pretty='> [%h] %s' -1)" >> $GITHUB_ENV
+          echo "version=$(prop version)" >> $GITHUB_ENV
+
+          make_latest=false
+          flag_release=false
+          pre=false
+          release=$(prop release)
+          if [ "$release" = "1" ]; then
+            flag_release=true
+            make_latest=true
+            pre=true
+          elif [ "$release" = "2" ]; then
+            flag_release=true
+            make_latest=true
+          fi
+          
+          echo "pre=$pre" >> $GITHUB_ENV
+          echo "flag_release=$flag_release" >> $GITHUB_ENV
+          echo "make_latest=$make_latest" >> $GITHUB_ENV
+        shell: bash
+
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        if: env.flag_release == 'true'
+        with:
+          tag: ${{ env.version }}-${{ env.commit }}
+          name: HareBell - ${{ env.version }} - ${{ env.commit }}
+          body: |
+            ### Version Info
+            > ${{ env.version }}-${{ env.commit }}
+            This release is automatically compiled by GitHub Actions.
+            ### Commit Info
+            ${{ env.commit_msg }}
+          artifacts: |
+            build/libs/harebell.jar
+          generateReleaseNotes: true
+          prerelease: ${{ env.pre }}
+          makeLatest: ${{ env.make_latest }}
