@@ -41,8 +41,8 @@ data class GithubRelease(
     val assets: List<GithubAsset> = emptyList()
 )
 
-class MintApiClient(
-    private val repoTarget: RepoTarget = RepoTarget(),
+class HareBellApiClient(
+    private val repoTarget: RepoTarget,
     private val proxySources: List<ProxySource> = ProxySource.values().toList()
 ) {
 

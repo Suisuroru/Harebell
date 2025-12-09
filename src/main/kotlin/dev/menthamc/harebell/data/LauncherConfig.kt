@@ -15,7 +15,9 @@ data class LauncherConfig(
     val serverArgs: String = "",
     val jarName: String = "",
     val jarHash: String = "",
-    val lastSelectedReleaseTag: String? = null
+    val lastSelectedReleaseTag: String? = null,
+    val repoOwner: String? = null,
+    val repoName: String? = null
 )
 
 class LauncherConfigStore(
