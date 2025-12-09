@@ -1,11 +1,9 @@
 ﻿package dev.menthamc.harebell
 
-import dev.menthamc.harebell.data.GithubAsset
-import dev.menthamc.harebell.data.GithubRelease
-import dev.menthamc.harebell.data.LauncherConfigStore
-import dev.menthamc.harebell.data.MintApiClient
-import dev.menthamc.harebell.data.ProxyTiming
-import dev.menthamc.harebell.data.RepoTarget
+import RepoInit
+import dev.menthamc.harebell.data.*
+import java.io.PrintStream
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -22,10 +20,8 @@ object CliMain {
     @JvmStatic
     fun main(args: Array<String>) {
         val configStore = LauncherConfigStore()
-        val repoTarget = RepoTarget()
-        val apiClient = MintApiClient(repoTarget = repoTarget)
-        var config = configStore.load()
-
+        var config = LauncherConfigStore().load()
+        var repoTarget: RepoTarget? = null
         val releaseTagInput = System.getProperty("minecraftVersion")
             ?: config.lastSelectedReleaseTag
         val installDir = System.getProperty("installDir")
@@ -38,6 +34,18 @@ object CliMain {
             ?: config.extraJvmArgs
         val jarName = System.getProperty("jarName")
             ?: config.jarName
+        val repoOwner = System.getProperty("repoOwner")
+            ?: config.repoOwner
+        val repoName = System.getProperty("repoName")
+            ?: config.repoName
+
+        if (repoOwner == null || repoName == null) {
+            repoTarget = RepoInit().init()
+        } else {
+            repoTarget = RepoTarget(repoOwner, repoName)
+        }
+
+        val apiClient = HareBellApiClient(repoTarget = repoTarget)
 
         val hasConfigFile = configStore.hasExistingConfig()
         val hasInstallProp = System.getProperty("installDir")?.isNotBlank() == true
@@ -49,19 +57,20 @@ object CliMain {
             showDir = hasConfigFile || hasInstallProp
         )
         configSourcePath?.let {
-            cliInfo("已找到配置文件: ${it.toAbsolutePath()}")
-        } ?: cliInfo("未找到配置文件，将使用默认配置并生成 harebell.json")
+            cliInfo("已找到配置文件 / Configuration file found: ${it.toAbsolutePath()}")
+        }
+            ?: cliInfo("未找到配置文件，将使用默认配置并生成 harebell.json / No configuration file found, will use default configuration and generate harebell.json")
 
         if (installDir.isBlank()) {
-            cliError("缺少下载目录：请提供 -DinstallDir=目录 或在配置文件/参数中指定")
+            cliError("缺少下载目录：请提供 -DinstallDir=目录 或在配置文件/参数中指定 / Missing download directory: Please provide -DinstallDir=directory or specify in config file/parameters")
             return
         }
 
         val releases = try {
-            cliStep("获取 Release 列表...")
+            cliStep("获取 Release 列表... / Fetching Release list...")
             apiClient.listReleases(limit = 50).filterNot { it.draft }
         } catch (e: Exception) {
-            cliError("获取 Release 列表失败: ${e.message}")
+            cliError("获取 Release 列表失败 / Failed to fetch Release list: ${e.message}")
             return
         }
 
@@ -70,15 +79,15 @@ object CliMain {
             normalizedInput != null && (it.tagName == releaseTagInput || it.tagName.stripLeadingV() == normalizedInput)
         } ?: releases.firstOrNull()
         if (release == null) {
-            cliError("未找到任何 Release")
+            cliError("未找到任何 Release / No Release found")
             return
         }
         val releaseTag = release.tagName
-        cliInfo("最新版本: $releaseTag")
+        cliInfo("最新版本: $releaseTag / Latest version: $releaseTag")
 
-        val asset = chooseJarAsset(release)
+        val asset = chooseJarAsset(release, repoTarget)
             ?: run {
-                cliError("该 Release 下没有 jar 资源，请检查 GitHub 页面")
+                cliError("该 Release 下没有 jar 资源，请检查 GitHub 页面 / No jar assets found in this Release, please check GitHub page")
                 return
             }
 
@@ -90,18 +99,18 @@ object CliMain {
         if (Files.exists(target) && config.jarHash.isNotBlank()) {
             val currentHash = sha256(target)
             if (currentHash.equals(config.jarHash, ignoreCase = true)) {
-                cliInfo("本地 hash 与配置一致，跳过下载: $targetName")
+                cliInfo("本地 hash 与配置一致，跳过下载 / Local hash matches configuration, skipping download: $targetName")
                 needDownload = false
                 finalHash = currentHash
             } else {
-                cliInfo("本地 hash 与配置不一致，执行更新: $targetName")
+                cliInfo("本地 hash 与配置不一致，执行更新 / Local hash does not match configuration, performing update: $targetName")
             }
         }
 
         if (needDownload) {
             val proxyChoice = apiClient.resolveDownloadUrl(asset) { timing ->
                 val speedText = timing.bytesPerSec?.let { formatSpeed(it) } ?: "fail"
-                cliInfo("测速: ${timing.source} -> $speedText")
+                cliInfo("测速 / Speed test: ${timing.source} -> $speedText")
             }
 
             try {
@@ -113,9 +122,9 @@ object CliMain {
                         val speed = t.bytesPerSec?.let { formatSpeed(it) } ?: "fail"
                         "${t.source}=$speed"
                     }
-                cliInfo("测速: $timingsText")
-                cliStep("下载: $targetName （源文件: ${asset.name}）")
-                proxyChoice.proxyHost?.let { cliInfo("使用下载源: ${proxyChoice.source} -> $it") }
+                cliInfo("测速 / Speed test: $timingsText")
+                cliStep("下载 / Downloading: $targetName (源文件 / source file: ${asset.name})")
+                proxyChoice.proxyHost?.let { cliInfo("使用下载源: ${proxyChoice.source} -> $it / Using download source: ${proxyChoice.source} -> $it") }
                 apiClient.downloadAsset(
                     asset = asset,
                     target = target,
@@ -124,13 +133,13 @@ object CliMain {
                         val totalText = total?.let { "/ ${formatBytes(it)}" } ?: ""
                         val pct = total?.let { (downloaded * 100 / it).coerceIn(0, 100) }
                         val pctText = pct?.let { " ($it%)" } ?: ""
-                        cliProgress("下载进度: ${formatBytes(downloaded)}$totalText$pctText")
+                        cliProgress("下载进度 / Download progress: ${formatBytes(downloaded)}$totalText$pctText")
                     }
                 )
-                cliOk("下载完成: $targetName")
+                cliOk("下载完成 / Download completed: $targetName")
                 finalHash = sha256(target)
             } catch (e: Exception) {
-                cliError("下载失败: ${e.message}")
+                cliError("下载失败 / Download failed: ${e.message}")
                 return
             }
         }
@@ -141,7 +150,9 @@ object CliMain {
             maxMemory = mem,
             jarName = targetName,
             jarHash = finalHash ?: "",
-            lastSelectedReleaseTag = releaseTag
+            lastSelectedReleaseTag = releaseTag,
+            repoOwner = repoTarget.owner,
+            repoName = repoTarget.repo
         )
         configStore.save(config)
 
@@ -158,16 +169,16 @@ object CliMain {
         argsList += target.toAbsolutePath().toString()
         argsList += config.serverArgs.split(Regex("\\s+")).filter { it.isNotBlank() }
 
-        cliStep("启动: ${argsList.joinToString(" ")}")
+        cliStep("启动 / Launching: ${argsList.joinToString(" ")}")
         try {
             val pb = ProcessBuilder(argsList)
                 .directory(Paths.get(installDir).toFile())
                 .inheritIO()
             val proc = pb.start()
             val exit = proc.waitFor()
-            cliInfo("进程退出，代码=$exit")
+            cliInfo("进程退出，代码=$exit / Process exited with code=$exit")
         } catch (e: Exception) {
-            cliError("启动失败: ${e.message}")
+            cliError("启动失败 / Launch failed: ${e.message}")
         }
     }
 }
@@ -175,7 +186,14 @@ object CliMain {
 @Suppress("UNUSED_PARAMETER")
 private fun printIntro(repoUrl: String, installDir: String, jarName: String, showDir: Boolean) {
     val palette = if (ANSI_ENABLED) {
-        listOf("\u001B[38;5;45m", "\u001B[38;5;81m", "\u001B[38;5;117m", "\u001B[38;5;153m", "\u001B[38;5;189m", "\u001B[38;5;219m")
+        listOf(
+            "\u001B[38;5;45m",
+            "\u001B[38;5;81m",
+            "\u001B[38;5;117m",
+            "\u001B[38;5;153m",
+            "\u001B[38;5;189m",
+            "\u001B[38;5;219m"
+        )
     } else {
         listOf("")
     }
@@ -204,8 +222,8 @@ private fun printIntro(repoUrl: String, installDir: String, jarName: String, sho
 
     println()
     val infoLines = mutableListOf<String>()
-    infoLines += accent("Harebell 更新程序已准备就绪", "\u001B[38;5;183m")
-    infoLines += "了解更多: $REPO_URL"
+    infoLines += accent("Harebell 更新程序已准备就绪 / Harebell Update Program Ready", "\u001B[38;5;183m")
+    infoLines += "了解更多 / Learn more: $REPO_URL"
     printBox(infoLines)
 }
 
@@ -246,11 +264,11 @@ private fun accent(text: String, color: String = "\u001B[38;5;111m"): String =
 private fun colorize(text: String, color: String): String =
     if (ANSI_ENABLED && color.isNotEmpty()) "$color$text$ANSI_RESET" else text
 
-private fun chooseJarAsset(release: GithubRelease): GithubAsset? {
+private fun chooseJarAsset(release: GithubRelease, repoTarget: RepoTarget): GithubAsset? {
     val jars = release.assets.filter { it.name.endsWith(".jar", ignoreCase = true) }
     val preferred = jars.firstOrNull {
         val n = it.name.lowercase()
-        "paperclip" in n || "server" in n || "mint" in n || "harebell" in n
+        "paperclip" in n || "server" in n || repoTarget.repo.lowercase() in n || repoTarget.owner.lowercase() in n
     }
     return preferred ?: jars.firstOrNull()
 }
@@ -310,7 +328,8 @@ private fun cliInfo(msg: String) = println("[>] $msg")
 private fun cliOk(msg: String) = println("[✓] $msg")
 private fun cliError(msg: String) = println("[!] $msg")
 
-@Volatile private var lastProgress: String? = null
+@Volatile
+private var lastProgress: String? = null
 private fun cliProgress(msg: String) {
     if (msg == lastProgress) return
     lastProgress = msg
