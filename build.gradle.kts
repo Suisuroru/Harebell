@@ -6,9 +6,6 @@ plugins {
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
-group = "dev.menthamc"
-version = "1.0.2"
-
 repositories {
     mavenCentral()
     maven("https://repo.menthamc.org/repository/maven-public/")
