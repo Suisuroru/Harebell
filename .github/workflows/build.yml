@@ -31,7 +31,9 @@ jobs:
 
       - name : Setup Env
         run: |
-          prop() {grep "^[[:space:]]*${1}" gradle.properties | cut -d'=' -f2 | sed 's/^[[:space:]]*//; s/\r//'}
+          prop() {
+            grep "^[[:space:]]*${1}" gradle.properties | cut -d'=' -f2 | sed 's/^[[:space:]]*//; s/\r//'
+          }
           echo "commit=$(git log --pretty='> [%h] %s' -1)" >> $GITHUB_ENV
           echo "version=$(prop version)" >> $GITHUB_ENV
 
@@ -49,9 +51,10 @@ jobs:
           echo "pre=$pre" >> $GITHUB_ENV
           echo "flag_release=$flag_release" >> $GITHUB_ENV
           echo "make_latest=$make_latest" >> $GITHUB_ENV
+        shell: bash
 
 
-      - name: Create Release - No Comment
+      - name: Create Release
         uses: ncipollo/release-action@v1
         if: env.flag_release == 'true'
         with:
